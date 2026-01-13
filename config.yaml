@@ -1,0 +1,4 @@
+next-day-cutoff-HH-mm-ss: 08:00:00
+db-path: db.db
+timezone: America/New_York
+week-start-day: Monday

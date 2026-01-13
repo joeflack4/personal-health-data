@@ -1,0 +1,97 @@
+# Boilerplate
+__pycache__/
+_archive/
+_dev/
+.idea/
+build/
+dev/
+dist/
+ignored/
+logs/
+*~$*
+*.DS_Store
+*.egg-info
+*.swp
+MANIFEST
+
+# Custom
+.playwright-mcp/
+output/
+bak/
+/*.json
+!config/
+*/cache/*
+!*/cache/.keep
+flag-words.txt
+.ipynb_checkpoints/
+*.parquet*
+env/*
+/venv/
+junk
+*/junk.json
+*.ipynb
+.idea
+.DS_Store
+backup/
+.vscode/
+*.code-workspace
+*.dmp
+.log
+tmp/
+temp/
+
+# Environment files
+.env
+!.env.example
+
+# Frontend
+# - JS: CreateReactApp
+#   See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+#   dependencies
+node_modules
+/.pnp
+.pnp.js
+.vite/
+# testing
+/coverage
+/frontend/tests/e2e/output/
+/frontend/playwright/.cache/
+/frontend/tests/playwright/performance/*
+!/frontend/tests/playwright/performance/.keep
+test/_analysis/input
+# production
+/build
+# misc
+npm-debug.log*
+/frontend/.yarn/*
+yarn-debug.log*
+yarn-error.log*
+
+# LLM
+.claude/settings.local.json
+models/
+
+# Test
+playwright-report/
+test-results/
+test_output/
+test/_infra/test_genonaut_api.sqlite3
+
+# Infra
+celerybeat-schedule.db
+*.tfvars
+!*.tfvars.example
+.terraform/
+*.tfstate
+*.tfstate.backup
+backend.hcl
+
+# Load Testing
+infra/load_tests/results/
+
+# Sqlite
+*.db
+*.db*
+*.sqlite
+*.db.backup
+*.sqlite.backup

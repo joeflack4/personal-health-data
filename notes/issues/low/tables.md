@@ -1,0 +1,6 @@
+- [ ] Add optional data table (not implemented)
+  - [ ] Display weekly data in table format
+  - [ ] Show week_start_date, total_drinks
+  - [ ] Enable sorting
+  - [ ] Use dash DataTable component
+  - [ ] Style table consistently with app theme
