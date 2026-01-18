@@ -26,6 +26,11 @@ def validate_events(events: List[RawEvent]) -> Tuple[List[RawEvent], List[ErrorR
     start_events = {}  # {event_name: list of (index, event)}
 
     for idx, event in enumerate(events):
+        # Skip Start/Stop validation for alcohol events
+        if event.event_name == "飲み物":
+            validated_events.append(event)
+            continue
+
         if event.start_stop == 'Start':
             # Track start events
             if event.event_name not in start_events:

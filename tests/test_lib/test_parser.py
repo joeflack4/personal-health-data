@@ -88,6 +88,77 @@ def test_next_day_cutoff_logic():
     assert effective_date == '2021-01-31', f"Expected 2021-01-31, got {effective_date}"
 
 
+def test_parse_retro_event_with_blank_date():
+    """Test that retro events with blank Retro: Date fall back to timestamp.
+
+    This tests Problem 1: When Retro: Date is blank, use timestamp's effective date.
+    """
+    data = {
+        'Timestamp': ['1/28/2021 7:00:00'],  # 7am - before 8am cutoff, so effective date is Jan 27
+        'A) Report event (今)': [None],
+        'Is now the stop or start time?': [None],
+        'B) Report event (別時)': ['飲み物'],
+        'Retro: stop or start time?': [None],
+        'Retro: Time': ['10:00:00 PM'],  # 10pm
+        'Retro: Date': [None],  # BLANK - should fall back to timestamp's date
+        'Comments': ['1.5'],
+    }
+    df = pd.DataFrame(data)
+
+    config = Config(
+        sheet_id='test',
+        next_day_cutoff='08:00:00',
+        db_path='test.db',
+        timezone='America/New_York',
+        week_start_day='Monday'
+    )
+
+    events = parse_sheet_data(df, config)
+
+    assert len(events) == 1, f"Expected 1 event, got {len(events)}"
+    assert events[0].event_name == '飲み物'
+    assert events[0].event_type == 'retro'
+    # Should use timestamp's date (Jan 28) with retro time (10pm)
+    # 10pm is after 8am cutoff, so effective date should be Jan 28
+    assert events[0].actual_datetime.day == 28
+    assert events[0].actual_datetime.hour == 22  # 10pm
+    assert events[0].effective_date == '2021-01-28'
+
+
+def test_parse_retro_event_with_blank_date_and_blank_time():
+    """Test that retro events with blank Retro: Date and Time use timestamp as-is."""
+    data = {
+        'Timestamp': ['1/28/2021 7:00:00'],  # 7am - before 8am cutoff
+        'A) Report event (今)': [None],
+        'Is now the stop or start time?': [None],
+        'B) Report event (別時)': ['飲み物'],
+        'Retro: stop or start time?': [None],
+        'Retro: Time': [None],  # BLANK
+        'Retro: Date': [None],  # BLANK
+        'Comments': ['2.0'],
+    }
+    df = pd.DataFrame(data)
+
+    config = Config(
+        sheet_id='test',
+        next_day_cutoff='08:00:00',
+        db_path='test.db',
+        timezone='America/New_York',
+        week_start_day='Monday'
+    )
+
+    events = parse_sheet_data(df, config)
+
+    assert len(events) == 1, f"Expected 1 event, got {len(events)}"
+    assert events[0].event_name == '飲み物'
+    assert events[0].event_type == 'retro'
+    # Should use timestamp as-is: Jan 28, 7am
+    # 7am is before 8am cutoff, so effective date should be Jan 27
+    assert events[0].actual_datetime.day == 28
+    assert events[0].actual_datetime.hour == 7
+    assert events[0].effective_date == '2021-01-27'
+
+
 def test_parse_sheet_data_with_actual_csv():
     """Test parsing with actual CSV data."""
     # Load the actual CSV we downloaded

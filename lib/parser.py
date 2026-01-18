@@ -115,15 +115,41 @@ def parse_sheet_data(df: pd.DataFrame, config: Config) -> List[RawEvent]:
                 # Parse retro date and time
                 retro_date = row.get('Retro: Date')
                 retro_time = row.get('Retro: Time')
-                actual_dt = parse_datetime_field(retro_date, retro_time)
 
-                if actual_dt is None:
-                    logger.warning(
-                        f"Row {idx}: Failed to parse retro datetime date='{retro_date}', time='{retro_time}'"
-                    )
-                    continue
+                # If retro_date is blank, fall back to timestamp
+                if pd.isna(retro_date) or not retro_date:
+                    # Use timestamp field with retro_time if available
+                    timestamp_str = row.get('Timestamp')
+                    timestamp_dt = parse_datetime_field(timestamp_str)
 
-                # Use timestamp field for reference
+                    if timestamp_dt is None:
+                        logger.warning(f"Row {idx}: Failed to parse timestamp '{timestamp_str}'")
+                        continue
+
+                    # If retro_time is provided, combine timestamp's date with retro_time
+                    if pd.notna(retro_time) and retro_time:
+                        # Use timestamp's date but with retro_time
+                        date_part = timestamp_dt.strftime('%Y-%m-%d')
+                        actual_dt = parse_datetime_field(date_part, retro_time)
+                        if actual_dt is None:
+                            logger.warning(
+                                f"Row {idx}: Failed to parse combined datetime date='{date_part}', time='{retro_time}'"
+                            )
+                            continue
+                    else:
+                        # Use timestamp as-is
+                        actual_dt = timestamp_dt
+                else:
+                    # Normal retro event with explicit date
+                    actual_dt = parse_datetime_field(retro_date, retro_time)
+
+                    if actual_dt is None:
+                        logger.warning(
+                            f"Row {idx}: Failed to parse retro datetime date='{retro_date}', time='{retro_time}'"
+                        )
+                        continue
+
+                # Keep timestamp field for reference
                 timestamp_str = row.get('Timestamp')
                 parse_datetime_field(timestamp_str)  # For validation
 
