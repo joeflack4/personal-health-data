@@ -39,6 +39,9 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
 )
 
+# Expose Flask server for production WSGI servers (e.g., Gunicorn)
+server = app.server
+
 # Set layout
 app.layout = create_layout()
 

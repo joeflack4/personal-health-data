@@ -159,6 +159,91 @@ def test_parse_retro_event_with_blank_date_and_blank_time():
     assert events[0].effective_date == '2021-01-27'
 
 
+def test_parse_week_with_11_alcohol_events():
+    """Test parsing a specific week that should have 11 total drinks.
+
+    This tests the week of 2024-02-26 to 2024-03-03, which contains 11
+    alcohol events totaling 11 drinks. This test ensures our parsing logic correctly:
+    1. Handles retro events with blank dates (falls back to timestamp)
+    2. Applies next-day cutoff logic correctly
+    3. Extracts drink counts from comments (where numeric)
+    4. Aggregates by week correctly
+
+    Note: Natural language in comments like "half glass of wine" or "Beer and mixed drink"
+    are not parsed; only numeric values at the start of comments are extracted.
+    """
+    import os
+    from lib.transformer import extract_alcohol_events, aggregate_by_week
+
+    csv_path = 'tests/test_lib/input/alc-2024-02-26--2024-03-03-16events.csv'
+
+    if not os.path.exists(csv_path):
+        pytest.skip(f"Test CSV file not found: {csv_path}")
+
+    # Read the CSV
+    df = pd.read_csv(csv_path)
+
+    config = Config(
+        sheet_id='test',
+        next_day_cutoff='08:00:00',
+        db_path='test.db',
+        timezone='America/New_York',
+        week_start_day='Monday'
+    )
+
+    # Parse events
+    events = parse_sheet_data(df, config)
+
+    # Extract alcohol events
+    alcohol_events = extract_alcohol_events(events)
+
+    # Filter to the specific week (2024-02-26 to 2024-03-03)
+    week_start = '2024-02-26'
+    week_end = '2024-03-03'
+
+    week_alcohol_events = [
+        e for e in alcohol_events
+        if week_start <= e.effective_date <= week_end
+    ]
+
+    # Debug output
+    print(f"\n=== Week 2024-02-26 to 2024-03-03 Analysis ===")
+    print(f"Total rows in CSV: {len(df)}")
+    print(f"Total events parsed: {len(events)}")
+    print(f"Total alcohol events: {len(alcohol_events)}")
+    print(f"Alcohol events in target week: {len(week_alcohol_events)}")
+    print(f"\nAlcohol events by date:")
+
+    from collections import defaultdict
+    events_by_date = defaultdict(list)
+    for event in week_alcohol_events:
+        events_by_date[event.effective_date].append(event.drink_count)
+
+    for date in sorted(events_by_date.keys()):
+        drinks = events_by_date[date]
+        total = sum(drinks)
+        print(f"  {date}: {len(drinks)} events, {total:.1f} total drinks")
+
+    # Calculate total drinks
+    total_drinks = sum(e.drink_count for e in week_alcohol_events)
+    print(f"\nTotal drinks in week: {total_drinks:.1f}")
+
+    # Aggregate by week to double-check
+    weekly_df = aggregate_by_week(alcohol_events)
+    target_week = weekly_df[weekly_df['week_start_date'] == week_start]
+
+    if not target_week.empty:
+        agg_total = target_week.iloc[0]['total_drinks']
+        agg_count = target_week.iloc[0]['event_count']
+        print(f"Weekly aggregation: {agg_count} events, {agg_total:.1f} total drinks")
+
+    # Assert the expected 11 total drinks
+    assert total_drinks == 11.0, (
+        f"Expected 11 total drinks in week 2024-02-26 to 2024-03-03, "
+        f"but got {total_drinks:.1f}"
+    )
+
+
 def test_parse_sheet_data_with_actual_csv():
     """Test parsing with actual CSV data."""
     # Load the actual CSV we downloaded

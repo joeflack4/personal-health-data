@@ -104,6 +104,8 @@ def backup_database(db_path: str) -> Optional[str]:
     """
     Create a timestamped backup of the database.
 
+    Backups are temporary failsafes during updates and are deleted after successful completion.
+
     Args:
         db_path: Path to database file
 
@@ -121,15 +123,26 @@ def backup_database(db_path: str) -> Optional[str]:
     shutil.copy2(db_path, backup_path)
     logger.info(f"Database backed up to {backup_path}")
 
-    # Clean up old backups (keep last 5)
-    backup_dir = db_file.parent
-    backups = sorted(backup_dir.glob(f"{db_file.name}.*.backup"))
-    if len(backups) > 5:
-        for old_backup in backups[:-5]:
-            old_backup.unlink()
-            logger.debug(f"Removed old backup: {old_backup}")
-
     return backup_path
+
+
+def delete_all_backups(db_path: str) -> None:
+    """
+    Delete all backup files for the given database.
+
+    Args:
+        db_path: Path to database file
+    """
+    db_file = Path(db_path)
+    backup_dir = db_file.parent
+    backups = list(backup_dir.glob(f"{db_file.name}.*.backup"))
+
+    for backup in backups:
+        backup.unlink()
+        logger.debug(f"Removed backup: {backup}")
+
+    if backups:
+        logger.info(f"Deleted {len(backups)} backup file(s)")
 
 
 def restore_database(db_path: str, backup_path: str) -> None:
@@ -266,8 +279,9 @@ def update_database(db_path: str, config_path: Optional[str] = None) -> Tuple[bo
     """
     Update database with latest data from Google Sheets.
 
-    Creates backup, populates new database, and replaces old one.
-    If error occurs, restores from backup.
+    Creates temporary backup before update, populates new database.
+    On success: deletes all backups (they're temporary failsafes only).
+    On failure: restores from backup and abandons the failed database.
 
     Args:
         db_path: Path to database file
@@ -276,6 +290,7 @@ def update_database(db_path: str, config_path: Optional[str] = None) -> Tuple[bo
     Returns:
         Tuple of (success, error_list)
     """
+    backup_path = None
     try:
         # Create backup if database exists
         backup_path = backup_database(db_path)
@@ -290,16 +305,32 @@ def update_database(db_path: str, config_path: Optional[str] = None) -> Tuple[bo
         # Populate database
         errors = populate_database(db_path, config_path)
 
+        # Success - delete all backups (they're temporary failsafes only)
+        delete_all_backups(db_path)
+        logger.info("Update successful, deleted temporary backups")
+
         return True, errors
 
     except Exception as e:
         logger.error(f"Error updating database: {e}")
+
+        # Clean up failed database
+        db_file = Path(db_path)
+        if db_file.exists():
+            try:
+                db_file.unlink()
+                logger.info("Removed failed database")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to remove failed database: {cleanup_error}")
 
         # Restore from backup if it exists
         if backup_path:
             try:
                 restore_database(db_path, backup_path)
                 logger.info("Database restored from backup after error")
+                # Delete all backups after restore
+                delete_all_backups(db_path)
+                logger.info("Deleted temporary backups after restore")
             except Exception as restore_error:
                 logger.error(f"Failed to restore database: {restore_error}")
 

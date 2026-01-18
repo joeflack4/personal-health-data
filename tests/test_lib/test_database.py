@@ -98,8 +98,12 @@ class TestBackupDatabase:
         assert backup_path is None
 
     @patch('lib.database.datetime')
-    def test_keeps_only_last_5_backups(self, mock_datetime, tmp_path):
-        """Test that old backups are cleaned up, keeping only last 5."""
+    def test_does_not_automatically_cleanup_backups(self, mock_datetime, tmp_path):
+        """Test that backup_database does not automatically clean up old backups.
+
+        Backups are temporary failsafes and are deleted after successful update,
+        not during backup creation.
+        """
         from datetime import datetime
         from pathlib import Path
 
@@ -118,14 +122,63 @@ class TestBackupDatabase:
             backup_path = backup_database(db_path)
             backups.append(backup_path)
 
-        # Check that only 5 most recent backups exist
+        # Check that ALL 7 backups still exist (no automatic cleanup)
         backup_dir = tmp_path
         remaining_backups = list(backup_dir.glob("test.db.*.backup"))
-        assert len(remaining_backups) == 5
+        assert len(remaining_backups) == 7
 
-        # Check that the oldest 2 backups were removed
-        for old_backup in backups[:2]:
-            assert not Path(old_backup).exists()
+        # All backups should exist
+        for backup in backups:
+            assert Path(backup).exists()
+
+
+class TestDeleteAllBackups:
+    """Tests for delete_all_backups function."""
+
+    @patch('lib.database.datetime')
+    def test_deletes_all_backups(self, mock_datetime, tmp_path):
+        """Test that all backups are deleted."""
+        from datetime import datetime
+        from lib.database import delete_all_backups
+        from pathlib import Path
+
+        db_path = str(tmp_path / "test.db")
+        create_database(db_path)
+
+        # Mock datetime.now() to return incrementing timestamps
+        timestamps = [
+            datetime(2021, 1, 1, 12, 0, i) for i in range(3)
+        ]
+        mock_datetime.now.side_effect = timestamps
+
+        # Create 3 backups
+        backup1 = backup_database(db_path)
+        backup2 = backup_database(db_path)
+        backup3 = backup_database(db_path)
+
+        # Verify 3 backups exist
+        backup_dir = tmp_path
+        backups = list(backup_dir.glob("test.db.*.backup"))
+        assert len(backups) == 3
+
+        # Delete all backups
+        delete_all_backups(db_path)
+
+        # Verify no backups remain
+        backups = list(backup_dir.glob("test.db.*.backup"))
+        assert len(backups) == 0
+
+    def test_handles_no_backups_gracefully(self, tmp_path):
+        """Test that delete_all_backups works when there are no backups."""
+        from lib.database import delete_all_backups
+
+        db_path = str(tmp_path / "test.db")
+        create_database(db_path)
+
+        # Delete all backups (there are none)
+        delete_all_backups(db_path)
+
+        # No error should be raised
 
 
 class TestRestoreDatabase:
@@ -296,12 +349,15 @@ class TestUpdateDatabase:
     """Tests for update_database function."""
 
     @patch('lib.database.populate_database')
-    def test_creates_backup_before_update(
+    def test_deletes_backups_after_successful_update(
         self,
         mock_populate,
         tmp_path,
     ):
-        """Test that backup is created before update."""
+        """Test that backups are deleted after successful update.
+
+        Backups are temporary failsafes and should be cleaned up after success.
+        """
         db_path = str(tmp_path / "test.db")
         create_database(db_path)
 
@@ -309,19 +365,21 @@ class TestUpdateDatabase:
 
         success, errors = update_database(db_path)
 
-        # Check that backup was created
-        backup_dir = tmp_path
-        backups = list(backup_dir.glob("test.db.*.backup"))
-        assert len(backups) == 1
+        # Check that update succeeded
         assert success is True
 
+        # Check that all backups were deleted
+        backup_dir = tmp_path
+        backups = list(backup_dir.glob("test.db.*.backup"))
+        assert len(backups) == 0
+
     @patch('lib.database.populate_database')
-    def test_restores_on_error(
+    def test_restores_on_error_and_cleans_up(
         self,
         mock_populate,
         tmp_path,
     ):
-        """Test that database is restored from backup on error."""
+        """Test that database is restored from backup on error and backups are cleaned up."""
         db_path = str(tmp_path / "test.db")
         create_database(db_path)
 
@@ -352,6 +410,11 @@ class TestUpdateDatabase:
         conn.close()
 
         assert count == 1
+
+        # Verify all backups were deleted after restore
+        backup_dir = tmp_path
+        backups = list(backup_dir.glob("test.db.*.backup"))
+        assert len(backups) == 0
 
 
 class TestGetLastUpdated:

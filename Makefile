@@ -1,4 +1,4 @@
-.PHONY: help run start serve init update status clean test format lint
+.PHONY: help run start serve deploy-prod init update status clean test format lint deploy-prod-scale
 
 # Default target
 help:
@@ -7,6 +7,7 @@ help:
 	@echo "  make serve       - Start the Dash app and open in browser"
 	@echo "  make run         - Start the Dash app (alias: start)"
 	@echo "  make start       - Start the Dash app (alias for run)"
+	@echo "  make deploy-prod - Run app with Gunicorn (production)"
 	@echo ""
 	@echo "  make init        - Initialize database"
 	@echo "  make update      - Update database with latest data"
@@ -30,6 +31,17 @@ serve: run
 #serve:
 #	@echo "Starting Dash app and opening browser..."
 #	@(uv run python -m app.main &); sleep 2; open http://127.0.0.1:8050
+
+# Production deployment
+deploy-prod:
+	@echo "Starting app with Gunicorn (production server)..."
+	@echo "PORT: $${PORT:-8050}"
+	uv run gunicorn app.main:server --bind 0.0.0.0:$${PORT:-8050} --timeout 120
+
+deploy-prod-scale:
+	@echo "Starting app with Gunicorn (production server)..."
+	@echo "PORT: $${PORT:-8050}"
+	uv run gunicorn app.main:server --bind 0.0.0.0:$${PORT:-8050} --workers 4 --timeout 120
 
 # Database commands
 init:
