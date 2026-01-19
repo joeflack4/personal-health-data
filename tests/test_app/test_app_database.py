@@ -11,9 +11,18 @@ from app import database
 
 
 def test_database_exists(tmp_path):
+    """Test that database_exists checks for initialized database."""
     db_file = tmp_path / "db.db"
     assert database.database_exists(str(db_file)) is False
-    db_file.write_text("")
+
+    # Create database with db_metadata table and last_updated set
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE db_metadata (key TEXT PRIMARY KEY, value TEXT)")
+    cursor.execute("INSERT INTO db_metadata (key, value) VALUES ('last_updated', '2021-01-01T00:00:00')")
+    conn.commit()
+    conn.close()
+
     assert database.database_exists(str(db_file)) is True
 
 
@@ -33,6 +42,12 @@ def test_get_weekly_alcohol_data_filters_range(tmp_path):
     db_file = tmp_path / "db.db"
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
+
+    # Create db_metadata table to mark database as initialized
+    cursor.execute("CREATE TABLE db_metadata (key TEXT PRIMARY KEY, value TEXT)")
+    cursor.execute("INSERT INTO db_metadata (key, value) VALUES ('last_updated', '2021-01-01T00:00:00')")
+
+    # Create alcohol_weekly table
     cursor.execute(
         """
         CREATE TABLE alcohol_weekly (
